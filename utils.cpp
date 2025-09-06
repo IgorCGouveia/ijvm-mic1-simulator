@@ -2,14 +2,12 @@
 
 using namespace std;
 
-int btod (string b) {
-  int d = 0;
-
-  for (int i=0; i<b.size(); i++) {
-    if (b[i] == '1') d += pow(2, b.size() - i - 1);
-  }
-
-  return d;
+int btod(const string& b) {
+    int d = 0;
+    for (size_t i = 0; i < b.size(); i++) {
+        if (b[i] == '1') d += 1 << (b.size() - i - 1);
+    }
+    return d;
 }
 
 /*

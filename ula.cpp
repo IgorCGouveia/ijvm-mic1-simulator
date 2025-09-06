@@ -4,13 +4,14 @@
 
 using namespace std;
 
-string execULA(int opcode, int a, int b) {
+pair<string, int> execULA(int opcode, int a, int b, int inv) {
     int result = 0;
+    int iout = 0;
     switch (opcode) {
         case 24: result = a; break;
         case 20: result = b; break;
-        case 26: result = ~a; break;
-        case 44: result = ~b; break;
+        case 26: result = !a; break;
+        case 44: result = !b; break;
         case 60: result = a + b; break;
         case 61: result = a + b + 1; break;
         case 57: result = a + 1; break;
@@ -18,17 +19,19 @@ string execULA(int opcode, int a, int b) {
         case 63: result = b - a; break;
         case 54: result = b - 1; break;
         case 59: result = -a; break;
-        case 12: result = a & b; break; 
+        case 12: result = a && b; break; 
         case 28: result = a || b; break;
         case 16: result = 0; break;
         case 49: result = 1; break;
         default: result = -1; break;
     }
-    return bitset<1>(result).to_string();
+    if(result > 1) iout = 1;
+    return {bitset<1>(result).to_string(), iout};
 }
 
 int main(int argc, char* argv[]) {
-  int A, B; cin >> A >> B;
+  int A, B, INV; cin >> A >> B >> INV;
+  int PC = 1;
 
   ifstream input ("./in.txt");
   if(!input){
@@ -36,9 +39,27 @@ int main(int argc, char* argv[]) {
       return -1;
   }
 
+  ofstream output ("./out.txt");
+  if(!input){
+      printf("erro ao abrir arquivo");
+      return -1;
+  }
+
   string l;
   while (getline(input, l)) {
-    cout << execULA(btod(l), A, B) << endl;
+    cout << "OP:" << btod(l) << endl;
+    pair<string, int> result = execULA(btod(l), A, B, INV);
+    cout << result.first << ", " << result.second << endl;
+
+    output << "PC=" << PC
+      << " IR=" << l
+      << " A=" << A
+      << " B=" << B
+      << " S=" << result.first
+      << " Vai-um=" << result.second
+      << endl;
+
+    PC++;
   }
 
   input.close();
