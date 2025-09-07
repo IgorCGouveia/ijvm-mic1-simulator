@@ -64,6 +64,8 @@ int main(int argc, char* argv[]) {
       << " B=" << B
       << " S=" << result.first
       << " Vai-um=" << result.second
+      << " Z= " << ((result.first[0] - '0') ? 0 : 1)
+      << " N= ?"
       << endl;
 
     PC++;
