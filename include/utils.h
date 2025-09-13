@@ -4,4 +4,4 @@
 
 using namespace std;
 
-int btod(const string& b);
+long long btod(const string& b);

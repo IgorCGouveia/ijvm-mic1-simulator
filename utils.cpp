@@ -2,8 +2,8 @@
 
 using namespace std;
 
-int btod(const string& b) {
-    int d = 0;
+long long btod(const string& b) {
+    long long d = 0;
     for (size_t i = 0; i < b.size(); i++) {
         if (b[i] == '1') d += 1 << (b.size() - i - 1);
     }
