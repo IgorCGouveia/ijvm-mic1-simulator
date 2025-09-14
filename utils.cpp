@@ -10,6 +10,8 @@ long long btod(const string& b) {
     return d;
 }
 
+
+
 /*
 24
 20

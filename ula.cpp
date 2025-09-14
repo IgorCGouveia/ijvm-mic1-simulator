@@ -1,128 +1,137 @@
+#include <bits/stdc++.h>
 #include <utils.h>
-#include <fstream>
-#include <bitset>
-
-#define MAX 2147483647
-#define MIN -2147483647
-
-// 1 - ENTRADAS E SÁIDAS DE 32 BITS
-// INSTRUCAO DE 8 BITS
-
 using namespace std;
+using u32 = uint32_t;
+using i32 = int32_t;
 
-pair<string, long long int> execULA(int opcode, long long int a, long long int b, int sll8, int sra1)
-{
-  long long int result = 0;
-  int iout = 0;
-  switch (opcode)
-  {
-  case 24:
-    result = a;
-    break;
-  case 52:
-    result = b;
-    break;
-  case 26:
-    result = !a;
-    break;
-  case 44:
-    result = !b;
-    break;
-  case 60:
-    result = a + b;
-    break;
-  case 57:
-    result = a + 1;
-    break;
-  case 53:
-    result = b + 1;
-    break;
-  case 12:
-    result = a && b;
-    break;
-  case 28:
-    result = a | b;
-    break;
-  case 16:
-    result = 0;
-    break;
-  case 49:
-    result = 1;
-    break;
-  default:
-    result = -1;
-    break;
-  }
-
-  if (sll8)
-    result = result << 8;
-
-  if (sra1)
-    result = result >> 1;
-
-  cout << result << endl;
-
-  if (result > MAX || result < MIN)
-    iout = 1;
-
-  // Para adição (a + b):
-  if ((a > 0 && b > 0 && result < 0) || (a < 0 && b < 0 && result >= 0))
-    iout = 1;
-
-  // Para subtração (b - a):
-  if ((b >= 0 && a < 0 && result < 0) || (b < 0 && a >= 0 && result > 0))
-    iout = 1;
-
-  return {bitset<32>(result).to_string(), iout};
+string toBin(u32 x) {
+    string s; s.reserve(32);
+    for (int i = 31; i >= 0; --i) s.push_back(((x >> i) & 1u) ? '1' : '0');
+    return s;
 }
 
-int main(int argc, char *argv[])
+struct ULARes {
+    u32 s;
+    u32 sd;
+    int carry;
+    int N;
+    int Z;
+    bool shiftConflict;
+};
+
+ULARes ula(i32 A, i32 B,
+           bool SLL8, bool SRA1,
+           int F0, int F1, int ENA, int ENB, int INVA, int INC)
 {
-  string A, B;
-  cin.ignore();
-  getline(cin, A);
-  getline(cin, B);
-  int PC = 1;
-  int SLL8;
-  int SRA1;
+    u32 ua = ENA ? static_cast<u32>(A) : 0u;
+    if (INVA) ua = ~ua;
+    u32 ub = ENB ? static_cast<u32>(B) : 0u;
 
-  ifstream input("./in.txt");
-  if (!input)
-  {
-    printf("erro ao abrir arquivo");
-    return -1;
-  }
+    u32 op;
+    if (F0 == 0 && F1 == 0) op = ua & ub;
+    else if (F0 == 0 && F1 == 1) op = ua | ub;
+    else if (F0 == 1 && F1 == 0) op = ~ub;
+    else { // F0==1 && F1==1 -> soma
+        uint64_t sum = (uint64_t)ua + (uint64_t)ub + (INC ? 1ULL : 0ULL);
+        u32 s = static_cast<u32>(sum & 0xFFFFFFFFu);
+        int carry = static_cast<int>((sum >> 32) & 1u);
 
-  ofstream output("./out.txt");
-  if (!input)
-  {
-    printf("erro ao abrir arquivo");
-    return -1;
-  }
+        u32 sd = s;
+        bool conflict = (SLL8 && SRA1);
+        if (!conflict) {
+            if (SLL8) sd = (sd << 8);
+            else if (SRA1) {
+                // deslocamento aritmético: replicar bit de sinal
+                if (sd & 0x80000000u) sd = (sd >> 1) | 0x80000000u;
+                else sd = sd >> 1;
+            }
+        }
+        int Z = (sd == 0u) ? 1 : 0;
+        int N = ((sd & 0x80000000u) != 0u) ? 1 : 0;
+        return {s, sd, carry, N, Z, conflict};
+    }
 
-  string l;
-  while (getline(input, l))
-  {
-    SLL8 = l[0] - '0';
-    SRA1 = l[1] - '0';
-    cout << "OP:" << btod(l.substr(2)) << endl;
-    pair<string, long long int> result = execULA(btod(l.substr(2)), btod(A), btod(B), SLL8, SRA1);
-    cout << result.first.substr(1) << ", " << result.second << endl;
+    uint64_t tmp = (uint64_t)op + (INC ? 1ULL : 0ULL);
+    u32 s = static_cast<u32>(tmp & 0xFFFFFFFFu);
+    int carry = static_cast<int>((tmp >> 32) & 1u);
 
-    output << "PC=" << PC
-           << " IR=" << l
-           << " A=" << A
-           << " B=" << B
-           << " S=" << result.first
-           << " Vai-um=" << result.second
-           << " Z= " << ((result.first[0] - '0') ? 0 : 1)
-           << " N= ?"
-           << endl;
+    u32 sd = s;
+    bool conflict = (SLL8 && SRA1);
+    if (!conflict) {
+        if (SLL8) sd = (sd << 8);
+        else if (SRA1) {
+            if (sd & 0x80000000u) sd = (sd >> 1) | 0x80000000u;
+            else sd = sd >> 1;
+        }
+    }
+    int Z = (sd == 0u) ? 1 : 0;
+    int N = ((sd & 0x80000000u) != 0u) ? 1 : 0;
+    return {s, sd, carry, N, Z, conflict};
+}
 
-    PC++;
-  }
+int main(int argc, char** argv) {
+    //string BIN_A; getline(cin, BIN_A);
+    //string BIN_B; getline(cin, BIN_B);
+    //i32 A = BIN_A[0] == '1' ? - btod(BIN_A) : btod(BIN_A);
+    i32 A = 4294967295;
+    i32 B = 1;
 
-  input.close();
+    if (argc >= 4) {
+        long long tmpA = stoll(argv[2], nullptr, 0);
+        long long tmpB = stoll(argv[3], nullptr, 0);
+        A = static_cast<i32>(tmpA);
+        B = static_cast<i32>(tmpB);
+    }
 
-  return 0;
+    ifstream fin("./in.txt");
+    if (!fin.is_open()) {
+        cerr << "Erro ao abrir arquivo de entrada\n";
+        return 1;
+    }
+
+    ofstream fout("./out.txt");
+    if (!fin.is_open()) {
+        cerr << "Erro ao abrir arquivo de saída\n";
+        return 1;
+    }
+
+    fout << "Start of Program\n";    
+
+    string raw;
+    int pc = 1;
+    while (getline(fin, raw)) {
+        string instr;
+        for (char c : raw) if (c == '0' || c == '1') instr.push_back(c);
+        if (instr.size() != 8) continue;
+
+        bool SLL8 = instr[0] == '1';
+        bool SRA1 = instr[1] == '1';
+        int F0 = instr[2] - '0';
+        int F1 = instr[3] - '0';
+        int ENA = instr[4] - '0';
+        int ENB = instr[5] - '0';
+        int INVA = instr[6] - '0';
+        int INC = instr[7] - '0';
+
+        ULARes r = ula(A, B, SLL8, SRA1, F0, F1, ENA, ENB, INVA, INC);
+        fout << "============================================================\n";
+        fout << "Cycle "<< pc<< "\n";
+        if (!r.shiftConflict) {
+            fout << "PC = " << pc << "\n";
+            fout << "IR = " << instr << "\n";
+            fout << "b  = " << toBin(static_cast<u32>(B)) << "\n";
+            fout << "a  = " << toBin(static_cast<u32>(A)) << "\n";
+            fout << "s  = " << toBin(r.s) << "\n";
+            fout << "sd = " << toBin(r.sd) << "\n";
+            fout << "n = " << r.N << "\n";
+            fout << "z = " << r.Z << "\n";
+            fout << "co= " << r.carry << "\n";
+        } else {
+            fout << "> Error, invalid control signals.\n";
+            fout << "\n";
+        }
+        ++pc;
+    }
+    fin.close();
+    return 0;
 }
