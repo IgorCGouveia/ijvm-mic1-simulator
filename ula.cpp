@@ -5,17 +5,11 @@ using u32 = uint32_t;
 using i32 = int32_t;
 using i8 = int8_t;
 
-i32 H, OPC, TOS, CPP, LV, SP, PC, MDR, MAR;
+i32 H, OPC, TOS, CPP, LV, SP, PC, MDR, MAR , MBRU;
 i8 MBR;
 
-string toBin(u32 x)
-{
-    string s;
-    s.reserve(32);
-    for (int i = 31; i >= 0; --i)
-        s.push_back(((x >> i) & 1u) ? '1' : '0');
-    return s;
-}
+string rgsc;
+string rgsb[] = { "MDR", "PC", "MBR", "MBRU", "SP", "LV", "CPP", "TOS", "OPC" };
 
 struct ULARes
 {
@@ -101,24 +95,25 @@ i32 decodificador_4_para9(string &b_bus)
     switch (sel)
     {
     case 0:
-        return H;
-    case 1:
-        return OPC;
-    case 2:
-        return TOS;
-    case 3:
-        return CPP;
-    case 4:
-        return LV;
-    case 5:
-        return SP;
-    case 6:
-        return PC;
-    case 7:
         return MDR;
+    case 1:
+        return PC;
+    case 2:
+        return MBR;
+    case 3:
+        return MBRU;
+    case 4:
+        return SP;
+    case 5:
+        return LV;
+    case 6:
+        return CPP;
+    case 7:
+        return TOS;
     case 8:
-        return MAR;
+        return OPC;
     default:
+        cout << "Decodificador 4 para 9 Invalido" <<endl;
         return 0; // código inválido
     }
 }
@@ -127,44 +122,66 @@ i32 decodificador_4_para9(string &b_bus)
 // - c_bus: 9 bits, cada bit habilita um registrador
 // - valor: saída da ULA (C-bus)
 // Escreve nos registradores habilitados
-void selc_bus9bits(int c_bus, i32 valor)
+void selc_bus9bits(string c_bus, i32 valor)
 {
-    if (c_bus & (1 << 0))
+    if (c_bus[8] == '1') {
         H = valor;
-    if (c_bus & (1 << 1))
+        rgsc += "H, ";
+    }
+    if (c_bus[7] == '1') {
         OPC = valor;
-    if (c_bus & (1 << 2))
+        rgsc += "OPC, ";
+    }
+    if (c_bus[6] == '1') {
         TOS = valor;
-    if (c_bus & (1 << 3))
+        rgsc += "TOS, ";
+    }
+    if (c_bus[5] == '1') {
         CPP = valor;
-    if (c_bus & (1 << 4))
+        rgsc += "CPP, ";
+    }
+    if (c_bus[4] == '1') {
         LV = valor;
-    if (c_bus & (1 << 5))
+        rgsc += "LV, ";
+    }
+    if (c_bus[3] == '1') {
         SP = valor;
-    if (c_bus & (1 << 6))
+        rgsc += "SP, ";
+    }
+    if (c_bus[2] == '1') {
         PC = valor;
-    if (c_bus & (1 << 7))
+        rgsc += "PC, ";
+    }
+    if (c_bus[1] == '1'){       
         MDR = valor;
-
-    if (c_bus & (1 << 8))
+        rgsc += "MDR, ";
+    }    
+    if (c_bus[0] == '1'){       
         MAR = valor;
+        rgsc += "MAR, ";
+    }    
 }
 
 int main(int argc, char **argv)
 {
+
+    //Inicializa os registradores
+    H = OPC = TOS = CPP = LV = SP = PC = MDR = MAR = MBRU = 0;
+    MBR = -127;
+    
     // string BIN_A; getline(cin, BIN_A);
     // string BIN_B; getline(cin, BIN_B);
     // i32 A = BIN_A[0] == '1' ? - btod(BIN_A) : btod(BIN_A);
-    i32 A = -1;
-    i32 B = 1;
+    // i32 A = -1;
+    // i32 B = 1;
 
-    if (argc >= 4)
+    /*if (argc >= 4)
     {
         long long tmpA = stoll(argv[2], nullptr, 0);
         long long tmpB = stoll(argv[3], nullptr, 0);
         A = static_cast<i32>(tmpA);
         B = static_cast<i32>(tmpB);
-    }
+    } */
 
     ifstream fin("./in.txt");
     if (!fin.is_open())
@@ -174,7 +191,7 @@ int main(int argc, char **argv)
     }
 
     ofstream fout("./out.txt");
-    if (!fin.is_open())
+    if (!fout.is_open())
     {
         cerr << "Erro ao abrir arquivo de saída\n";
         return 1;
@@ -186,18 +203,21 @@ int main(int argc, char **argv)
     int pc = 1;
     while (getline(fin, raw))
     {
-
         string instr;
-        string ir = raw.substr(0, 7);
-        string c_bus = raw.substr(8, 16);
-        string b_bus = raw.substr(17);
+        string ir = raw.substr(0, 8);
+        string c_bus = raw.substr(9, 9);
+        string b_bus = raw.substr(17,4);
 
-        for (char c : raw)
+        cout << "IR: " << ir << " C: " << c_bus << " B: " << b_bus << endl;
+
+        for (char c : ir)
             if (c == '0' || c == '1')
                 instr.push_back(c);
         if (instr.size() != 8)
             continue;
 
+            
+        i32 B = decodificador_4_para9(b_bus);
         bool SLL8 = instr[0] == '1';
         bool SRA1 = instr[1] == '1';
         int F0 = instr[2] - '0';
@@ -207,20 +227,27 @@ int main(int argc, char **argv)
         int INVA = instr[6] - '0';
         int INC = instr[7] - '0';
 
-        ULARes r = ula(A, B, SLL8, SRA1, F0, F1, ENA, ENB, INVA, INC);
+        ULARes r = ula(H, B, SLL8, SRA1, F0, F1, ENA, ENB, INVA, INC);
+
+        selc_bus9bits(c_bus,r.sd);
+
         fout << "============================================================\n";
         fout << "Cycle " << pc << "\n";
         if (!r.shiftConflict)
         {
-            fout << "PC = " << pc << "\n";
-            fout << "IR = " << instr << "\n";
-            fout << "b  = " << toBin(static_cast<u32>(B)) << "\n";
-            fout << "a  = " << toBin(static_cast<u32>(A)) << "\n";
-            fout << "s  = " << toBin(r.s) << "\n";
-            fout << "sd = " << toBin(r.sd) << "\n";
-            fout << "n = " << r.N << "\n";
-            fout << "z = " << r.Z << "\n";
-            fout << "co= " << r.carry << "\n";
+            // Adicionar estado dos registradores para depuração
+            fout << "B = " << rgsc[B] << endl;
+            fout << "C = " << rgsc << endl;
+            fout << "\nRegisters:\n";
+            fout << "H   = " << H << " (" << toBin(static_cast<u32>(H)) << ")\n";
+            fout << "OPC = " << OPC << " (" << toBin(static_cast<u32>(OPC)) << ")\n";
+            fout << "TOS = " << TOS << " (" << toBin(static_cast<u32>(TOS)) << ")\n";
+            fout << "CPP = " << CPP << " (" << toBin(static_cast<u32>(CPP)) << ")\n";
+            fout << "LV  = " << LV << " (" << toBin(static_cast<u32>(LV)) << ")\n";
+            fout << "SP  = " << SP << " (" << toBin(static_cast<u32>(SP)) << ")\n";
+            fout << "PC  = " << PC << " (" << toBin(static_cast<u32>(PC)) << ")\n";
+            fout << "MDR = " << MDR << " (" << toBin(static_cast<u32>(MDR)) << ")\n";
+            fout << "MAR = " << MAR << " (" << toBin(static_cast<u32>(MAR)) << ")\n";
         }
         else
         {
@@ -230,5 +257,6 @@ int main(int argc, char **argv)
         ++pc;
     }
     fin.close();
+    fout.close();
     return 0;
 }

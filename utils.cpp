@@ -1,3 +1,4 @@
+#include <bits/stdc++.h>
 #include <utils.h>
 
 using namespace std;
@@ -10,6 +11,25 @@ long long btod(const string& b) {
     return d;
 }
 
+/* string toBin(int32_t x)
+{
+    string s;
+    s.reserve(32);
+    for (int i = 31; i >= 0; --i)
+        s.push_back(((x >> i) & 1) ? '1' : '0');
+    return s;
+} */
+
+string toBin(int32_t x)
+{
+    std::string s;  //CONSIDERA O SINAL
+    s.reserve(32);                  // 32 bits, inclusive o de sinal
+    // converte para uint32_t só para manipular os bits
+    uint32_t bits = static_cast<uint32_t>(x);
+    for (int i = 31; i >= 0; --i)
+        s.push_back(((bits >> i) & 1u) ? '1' : '0');
+    return s;
+}
 
 
 /*
