@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include <utils.h>
+
 using namespace std;
 using u32 = uint32_t;
 using i32 = int32_t;
@@ -10,6 +11,45 @@ i8 MBR;
 
 string rgsc;
 string rgsb[] = { "MDR", "PC", "MBR", "MBRU", "SP", "LV", "CPP", "TOS", "OPC" };
+
+static const string DATA_MEM_PATH = "./dados_etapa3_tarefa1.txt";
+static const string REGS_PATH = "./registradores_etapa3_tarefa1.txt";
+static const string MIC_PATH = "./micro_instrucoes_etapa3_tarefa1.txt";
+static vector<u32> DATA_MEM(16,0u);
+
+static void load_data_mem(){
+    ifstream f(DATA_MEM_PATH);
+    if(!f.is_open()) return;
+    string line;
+    for (int i = 0; i < 16 && getline(f,line); i++){
+        string bits;
+        for (char c : line){
+            if (c == '0' || c == '1')
+                bits.push_back(c);
+        }
+        if (bits.size() == 32){
+            DATA_MEM[i] = static_cast<u32>(btod(bits));
+        } else{
+            cerr << "Linha de dados invalida: '" << line << "'\n";
+            DATA_MEM[i] = 0u;
+        }
+
+    }
+    f.close();
+}
+
+
+static void save_data_mem(){
+    ofstream f(DATA_MEM_PATH, ios::trunc);
+    if(!f.is_open()){
+        cerr << "Erro ao salvar memoria em "<< DATA_MEM_PATH << endl;
+        return;
+    }
+    for (int i =0; i < 16; i++){
+        f << toBin(static_cast<u32>(DATA_MEM[i])) << endl;// talvez seja bom tirar o static cast ja que DATA_MEM ja é u32
+    }
+    f.close();
+}
 
 struct ULARes {
     u32 s;
@@ -154,7 +194,7 @@ string get_data(string &path, int line) {
     ifstream f(path);
     if(!f.is_open()) {
         cerr << "Erro ao abrir arquivo de entrada\n";
-        return;
+        return "";
     }
 
     while (getline(f, content_line)) {
@@ -169,22 +209,23 @@ string get_data(string &path, int line) {
 
 int main(int argc, char **argv)
 {
-    OPC = CPP = LV = SP = PC = MDR = MAR = MBRU = 0;
-    MBR = -127;
-    TOS = 2;
-    H = 1;
+    TOS = H = OPC = CPP = LV = SP = PC = MDR = MAR = MBRU = 0;
+    MBR = 0;
+    SP = MAR = 4;
 
-    ifstream fin("./in.txt");
+    ifstream fin(MIC_PATH);
     if (!fin.is_open()) {
         cerr << "Erro ao abrir arquivo de entrada\n";
         return 1;
     }
 
-    ofstream fout("./out.txt");
+    ofstream fout(REGS_PATH);
     if (!fout.is_open()) {
         cerr << "Erro ao abrir arquivo de saída\n";
         return 1;
     }
+
+    load_data_mem();
 
     fout << "Start of Program\n";
 
@@ -205,7 +246,7 @@ int main(int argc, char **argv)
         string wr = raw.substr(17, 2);
         string b_bus = raw.substr(19, 4);
 
-        cout << "IR: " << ir << " C: " << c_bus << " B: " << b_bus << endl;
+        cout << "IR: " << ir << " C: " << c_bus << " B: " << b_bus << " MEM: " << wr << endl;
 
         for (char c : ir)
             if (c == '0' || c == '1')
@@ -238,7 +279,35 @@ int main(int argc, char **argv)
         if (considera_sinal) selc_bus9bits(c_bus, r.sd);
         else selc_bus9bits(c_bus, btod(toBin(r.sd).substr(24, 31)));
 
-        
+        bool WRITE = (wr.size() >= 1 && wr[0] == '1');
+        bool READ  = (wr.size() >= 2 && wr[1] == '1');
+        bool mem_conflict = WRITE && READ;
+        string memLog;
+
+        int mar_idx = static_cast<int>(MAR);
+        bool mar_ok = (mar_idx >= 0 && mar_idx < 8);
+
+
+        if (mem_conflict) {
+            memLog = "Erro: WRITE e READ simultaneos.";
+        } else if (READ) {
+            if (mar_ok) {
+                MDR = static_cast<i32>(DATA_MEM[mar_idx]);
+                memLog = "READ: MDR <- M[" + to_string(MAR) + "]";
+            } else {
+                memLog = "READ ignorado: MAR fora de [0,7] (MAR=" + to_string(MAR) + ")";
+            }
+        } else if (WRITE) {
+            if (mar_ok) {
+                DATA_MEM[mar_idx] = static_cast<u32>(MDR);
+                save_data_mem();
+                memLog = "WRITE: M[" + to_string(MAR) + "] <- MDR";
+            } else {
+                memLog = "WRITE ignorado: MAR fora de [0,7] (MAR=" + to_string(MAR) + ")";
+            }
+        } else {
+            memLog = "Sem operacao de memoria.";
+        }
 
         fout << "============================================================\n";
         fout << "Cycle " << pc << "\n";
@@ -246,21 +315,24 @@ int main(int argc, char **argv)
         {
             fout << "B = " << rgsb[selB] << endl;
             fout << "C = " << rgsc << endl;
+            fout << "MEM = " << wr << " -> " << memLog << endl;
             fout << "\nRegisters:\n";
-            fout << "H   = " << H   << " (" << toBin(static_cast<u32>(H))   << ")\n";
-            fout << "OPC = " << OPC << " (" << toBin(static_cast<u32>(OPC)) << ")\n";
-            fout << "TOS = " << TOS << " (" << toBin(static_cast<u32>(TOS)) << ")\n";
-            fout << "CPP = " << CPP << " (" << toBin(static_cast<u32>(CPP)) << ")\n";
-            fout << "LV  = " << LV  << " (" << toBin(static_cast<u32>(LV))  << ")\n";
-            fout << "SP  = " << SP  << " (" << toBin(static_cast<u32>(SP))  << ")\n";
-            fout << "PC  = " << PC  << " (" << toBin(static_cast<u32>(PC))  << ")\n";
-            fout << "MDR = " << MDR << " (" << toBin(static_cast<u32>(MDR)) << ")\n";
             fout << "MAR = " << MAR << " (" << toBin(static_cast<u32>(MAR)) << ")\n";
-            fout << "MBR = " << MBR << " (" << toBin(static_cast<i8>(MBR)).substr(24, 31) << ")\n";
-           // fout << "MBRU = " << MBRU << " (" << toBin(static_cast<u32>(MBRU)) << ")\n";
+            fout << "MDR = " << MDR << " (" << toBin(static_cast<u32>(MDR)) << ")\n";
+            fout << "PC  = " << PC  << " (" << toBin(static_cast<u32>(PC))  << ")\n";
+            fout << "MBR = " << MBR << " (" << toBin(static_cast<i8>(MBR)).substr(24, 31) << ")\n";  
+            fout << "SP  = " << SP  << " (" << toBin(static_cast<u32>(SP))  << ")\n";
+            fout << "LV  = " << LV  << " (" << toBin(static_cast<u32>(LV))  << ")\n";
+            fout << "CPP = " << CPP << " (" << toBin(static_cast<u32>(CPP)) << ")\n";
+            fout << "TOS = " << TOS << " (" << toBin(static_cast<u32>(TOS)) << ")\n";
+            fout << "OPC = " << OPC << " (" << toBin(static_cast<u32>(OPC)) << ")\n";  
+            fout << "H   = " << H   << " (" << toBin(static_cast<u32>(H))   << ")\n";
         }
         else {
-            fout << "> Error, invalid control signals.\n\n";
+            if(r.shiftConflict)
+                fout << "> Error, invalid control signals.\n\n";
+            if(mem_conflict)
+                fout << "> Error, simultaneous memory READ and WRITE.\n";
         }
         ++pc;
     }
