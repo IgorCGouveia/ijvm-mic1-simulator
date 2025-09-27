@@ -17,6 +17,41 @@ static const string REGS_PATH = "./registradores_etapa3_tarefa1.txt";
 static const string MIC_PATH = "./micro_instrucoes_etapa3_tarefa1.txt";
 static vector<u32> DATA_MEM(16,0u);
 
+static void iload(int x) {
+    ofstream fout(MIC_PATH, ios::app);
+    if (!fout.is_open()) {
+        cerr << "Erro ao abrir arquivo de saída\n";
+        return;
+    }
+
+    fout << "00110100100000000000101\n";
+    
+    for (int i = 0; i<x; i++) {
+        fout << "00111001100000000000000\n";
+    }
+
+    fout << "00111000000000001010000\n";
+    fout << "00110101000001000000100\n";
+    fout << "00110100000000001100100\n";
+    fout << "00110100001000000000000\n";
+
+    fout.close();
+}
+
+void dup() {
+    ofstream fout(MIC_PATH, ios::app);
+    if (!fout.is_open()) {
+        cerr << "Erro ao abrir arquivo de saída\n";
+        return;
+    }
+
+    fout << "00110101000001000000100\n";
+    fout << "00110100000000001000100\n";
+    fout << "00110100000000010010111\n";
+
+    fout.close();
+}
+
 static void load_data_mem(){
     ifstream f(DATA_MEM_PATH);
     if(!f.is_open()) return;
@@ -209,6 +244,7 @@ string get_data(string &path, int line) {
 
 int main(int argc, char **argv)
 {
+    dup();
     TOS = H = OPC = CPP = LV = SP = PC = MDR = MAR = MBRU = 0;
     MBR = 0;
     SP = MAR = 4;
