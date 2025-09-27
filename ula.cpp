@@ -47,7 +47,24 @@ void dup() {
 
     fout << "00110101000001000000100\n";
     fout << "00110100000000001000100\n";
-    fout << "00110100000000010010111\n";
+    fout << "00110100000000010100111\n";
+
+    fout.close();
+}
+
+void bipush(string s) {
+    ofstream fout(MIC_PATH, ios::app);
+    if (!fout.is_open()) {
+        cerr << "Erro ao abrir arquivo de saída\n";
+        return;
+    }
+    
+    i32 valor = static_cast<i32>(btod(s));
+    H = valor;
+
+    fout << "00110101000001001000100\n";
+    fout << "00000000000000000010000\n";
+    fout << "00111000001000010100000\n";
 
     fout.close();
 }
@@ -181,7 +198,6 @@ i32 valor_reg_por_indice(int sel)
     }
 }
 
-// Escreve nos regstring c_buses habilitados
 void selc_bus9bits(string c_bus, i32 valor)
 {
     if (c_bus[0] == '1') {
@@ -245,9 +261,11 @@ string get_data(string &path, int line) {
 int main(int argc, char **argv)
 {
     dup();
-    TOS = H = OPC = CPP = LV = SP = PC = MDR = MAR = MBRU = 0;
+    H = OPC = CPP = SP = PC = MDR = MAR = MBRU = 0;
     MBR = 0;
     SP = MAR = 4;
+    TOS = 8;
+    LV = 1;
 
     ifstream fin(MIC_PATH);
     if (!fin.is_open()) {
