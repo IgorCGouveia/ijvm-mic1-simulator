@@ -6,41 +6,53 @@ using u32 = uint32_t;
 using i32 = int32_t;
 using i8 = int8_t;
 
-i32 H, OPC, TOS, CPP, LV, SP, PC, MDR, MAR , MBRU;
+i32 H, OPC, TOS, CPP, LV, SP, PC, MDR, MAR, MBRU;
 i8 MBR;
 
+i32 line_counter = 1;
+vector<i32> bipush_lines;
+vector<i32> bipush_values;
+
 string rgsc;
-string rgsb[] = { "MDR", "PC", "MBR", "MBRU", "SP", "LV", "CPP", "TOS", "OPC" };
+string rgsb[] = {"MDR", "PC", "MBR", "MBRU", "SP", "LV", "CPP", "TOS", "OPC"};
 
 static const string DATA_MEM_PATH = "./dados_etapa3_tarefa1.txt";
 static const string REGS_PATH = "./registradores_etapa3_tarefa1.txt";
 static const string MIC_PATH = "./micro_instrucoes_etapa3_tarefa1.txt";
-static vector<u32> DATA_MEM(16,0u);
+static const string IN_PATH = "./instrucoes_etapa3_tarefa1.txt";
+static vector<u32> DATA_MEM(16, 0u);
 
-static void iload(int x) {
+static void iload(int x)
+{
     ofstream fout(MIC_PATH, ios::app);
-    if (!fout.is_open()) {
+    if (!fout.is_open())
+    {
         cerr << "Erro ao abrir arquivo de saída\n";
         return;
     }
 
     fout << "00110100100000000000101\n";
-    
-    for (int i = 0; i<x; i++) {
+
+    for (int i = 0; i < x; i++)
+    {
         fout << "00111001100000000000000\n";
+        line_counter++;
     }
 
     fout << "00111000000000001010000\n";
     fout << "00110101000001000000100\n";
     fout << "00110100000000001100100\n";
     fout << "00110100001000000000000\n";
+    line_counter += 5;
 
     fout.close();
 }
 
-void dup() {
+void dup()
+{
     ofstream fout(MIC_PATH, ios::app);
-    if (!fout.is_open()) {
+    if (!fout.is_open())
+    {
         cerr << "Erro ao abrir arquivo de saída\n";
         return;
     }
@@ -48,62 +60,125 @@ void dup() {
     fout << "00110101000001000000100\n";
     fout << "00110100000000001000100\n";
     fout << "00110100000000010100111\n";
+    line_counter += 3;
 
     fout.close();
 }
 
-void bipush(string s) {
+void bipush(string s)
+{
     ofstream fout(MIC_PATH, ios::app);
-    if (!fout.is_open()) {
+    if (!fout.is_open())
+    {
         cerr << "Erro ao abrir arquivo de saída\n";
         return;
     }
-    
-    i32 valor = static_cast<i32>(btod(s));
-    H = valor;
 
     fout << "00110101000001001000100\n";
     fout << "00000000000000000010000\n";
     fout << "00111000001000010100000\n";
 
+    line_counter += 3;
+
     fout.close();
 }
 
-static void load_data_mem(){
-    ifstream f(DATA_MEM_PATH);
-    if(!f.is_open()) return;
+void translate_in_to_mic()
+{
+    ifstream fin(IN_PATH);
+    if (!fin.is_open())
+    {
+        cerr << "Erro ao abrir arquivo de saída\n";
+        return;
+    }
+
     string line;
-    for (int i = 0; i < 16 && getline(f,line); i++){
+
+    while (getline(fin, line))
+    {
+        if (line == "DUP")
+        {
+            dup();
+        }
+        else if (line.substr(0, 5) == "ILOAD")
+        {
+            // CORREÇÃO 1: Verificar se há espaço
+            string rest = line.substr(5); // Pegar tudo após "ILOAD"
+
+            // Remover espaços em branco
+            rest.erase(0, rest.find_first_not_of(" \t"));
+
+            if (!rest.empty())
+            {
+                try
+                {
+                    iload(stoi(rest));
+                }
+                catch (const exception &e)
+                {
+                    cerr << "Erro ao converter ILOAD: '" << line << "' - " << e.what() << endl;
+                }
+            }
+            else
+            {
+                cerr << "ILOAD sem parâmetro: '" << line << "'" << endl;
+            }
+        }
+        else if (line.substr(0, 6) == "BIPUSH")
+        {
+            bipush_lines.push_back(line_counter + 1);
+            bipush_values.push_back(btod(line.substr(7)));
+            bipush("");
+        }
+    }
+
+    fin.close();
+}
+
+static void load_data_mem()
+{
+    ifstream f(DATA_MEM_PATH);
+    if (!f.is_open())
+        return;
+    string line;
+    for (int i = 0; i < 16 && getline(f, line); i++)
+    {
         string bits;
-        for (char c : line){
+        for (char c : line)
+        {
             if (c == '0' || c == '1')
                 bits.push_back(c);
         }
-        if (bits.size() == 32){
+        if (bits.size() == 32)
+        {
             DATA_MEM[i] = static_cast<u32>(btod(bits));
-        } else{
+        }
+        else
+        {
             cerr << "Linha de dados invalida: '" << line << "'\n";
             DATA_MEM[i] = 0u;
         }
-
     }
     f.close();
 }
 
-
-static void save_data_mem(){
+static void save_data_mem()
+{
     ofstream f(DATA_MEM_PATH, ios::trunc);
-    if(!f.is_open()){
-        cerr << "Erro ao salvar memoria em "<< DATA_MEM_PATH << endl;
+    if (!f.is_open())
+    {
+        cerr << "Erro ao salvar memoria em " << DATA_MEM_PATH << endl;
         return;
     }
-    for (int i =0; i < 16; i++){
-        f << toBin(static_cast<u32>(DATA_MEM[i])) << endl;// talvez seja bom tirar o static cast ja que DATA_MEM ja é u32
+    for (int i = 0; i < 16; i++)
+    {
+        f << toBin(static_cast<u32>(DATA_MEM[i])) << endl; // talvez seja bom tirar o static cast ja que DATA_MEM ja é u32
     }
     f.close();
 }
 
-struct ULARes {
+struct ULARes
+{
     u32 s;
     u32 sd;
     int carry;
@@ -128,17 +203,20 @@ ULARes ula(i32 A, i32 B,
         op = ua | ub;
     else if (F0 == 1 && F1 == 0)
         op = ~ub;
-    else {
+    else
+    {
         uint64_t sum = (uint64_t)ua + (uint64_t)ub + (INC ? 1ULL : 0ULL);
         u32 s = static_cast<u32>(sum & 0xFFFFFFFFu);
         int carry = static_cast<int>((sum >> 32) & 1u);
 
         u32 sd = s;
         bool conflict = (SLL8 && SRA1);
-        if (!conflict) {
+        if (!conflict)
+        {
             if (SLL8)
                 sd = (sd << 8);
-            else if (SRA1) {
+            else if (SRA1)
+            {
                 if (sd & 0x80000000u)
                     sd = (sd >> 1) | 0x80000000u;
                 else
@@ -156,10 +234,12 @@ ULARes ula(i32 A, i32 B,
 
     u32 sd = s;
     bool conflict = (SLL8 && SRA1);
-    if (!conflict) {
+    if (!conflict)
+    {
         if (SLL8)
             sd = (sd << 8);
-        else if (SRA1) {
+        else if (SRA1)
+        {
             if (sd & 0x80000000u)
                 sd = (sd >> 1) | 0x80000000u;
             else
@@ -175,7 +255,8 @@ ULARes ula(i32 A, i32 B,
 int decodificador_idx(const string &b_bus)
 {
     int sel = static_cast<int>(btod(b_bus));
-    if (sel < 0 || sel > 8) {
+    if (sel < 0 || sel > 8)
+    {
         cerr << "Decodificador 4 para 9 Invalido (indice): " << sel << endl;
         return -1;
     }
@@ -184,97 +265,125 @@ int decodificador_idx(const string &b_bus)
 
 i32 valor_reg_por_indice(int sel)
 {
-    switch (sel) {
-    case 0: return MDR;
-    case 1: return PC;
-    case 2: return MBR;
-    case 3: return MBRU;
-    case 4: return SP;
-    case 5: return LV;
-    case 6: return CPP;
-    case 7: return TOS;
-    case 8: return OPC;
-    default: return 0;
+    switch (sel)
+    {
+    case 0:
+        return MDR;
+    case 1:
+        return PC;
+    case 2:
+        return MBR;
+    case 3:
+        return MBRU;
+    case 4:
+        return SP;
+    case 5:
+        return LV;
+    case 6:
+        return CPP;
+    case 7:
+        return TOS;
+    case 8:
+        return OPC;
+    default:
+        return 0;
     }
 }
 
 void selc_bus9bits(string c_bus, i32 valor)
 {
-    if (c_bus[0] == '1') {
+    if (c_bus[0] == '1')
+    {
         H = valor;
         rgsc += "H, ";
     }
-    if (c_bus[1] == '1') {
+    if (c_bus[1] == '1')
+    {
         OPC = valor;
         rgsc += "OPC, ";
     }
-    if (c_bus[2] == '1') {
+    if (c_bus[2] == '1')
+    {
         TOS = valor;
         rgsc += "TOS, ";
     }
-    if (c_bus[3] == '1') {
+    if (c_bus[3] == '1')
+    {
         CPP = valor;
         rgsc += "CPP, ";
     }
-    if (c_bus[4] == '1') {
+    if (c_bus[4] == '1')
+    {
         LV = valor;
         rgsc += "LV, ";
     }
-    if (c_bus[5] == '1') {
+    if (c_bus[5] == '1')
+    {
         SP = valor;
         rgsc += "SP, ";
     }
-    if (c_bus[6] == '1') {
+    if (c_bus[6] == '1')
+    {
         PC = valor;
         rgsc += "PC, ";
     }
-    if (c_bus[7] == '1'){       
+    if (c_bus[7] == '1')
+    {
         MDR = valor;
         rgsc += "MDR, ";
-    }    
-    if (c_bus[8] == '1'){       
+    }
+    if (c_bus[8] == '1')
+    {
         MAR = valor;
         rgsc += "MAR, ";
-    }    
+    }
 }
 
-string get_data(string &path, int line) {
+string get_data(string &path, int line)
+{
     int count = 0;
     string content_line;
 
     ifstream f(path);
-    if(!f.is_open()) {
+    if (!f.is_open())
+    {
         cerr << "Erro ao abrir arquivo de entrada\n";
         return "";
     }
 
-    while (getline(f, content_line)) {
-        if (count == line) break;
+    while (getline(f, content_line))
+    {
+        if (count == line)
+            break;
         count++;
     }
-    
+
     f.close();
-    
+
     return content_line;
 }
 
 int main(int argc, char **argv)
 {
-    dup();
-    H = OPC = CPP = SP = PC = MDR = MAR = MBRU = 0;
+
+    H = OPC = CPP = SP = PC = MDR = MAR = 0;
     MBR = 0;
     SP = MAR = 4;
     TOS = 8;
     LV = 1;
 
+    translate_in_to_mic();
+
     ifstream fin(MIC_PATH);
-    if (!fin.is_open()) {
+    if (!fin.is_open())
+    {
         cerr << "Erro ao abrir arquivo de entrada\n";
         return 1;
     }
 
     ofstream fout(REGS_PATH);
-    if (!fout.is_open()) {
+    if (!fout.is_open())
+    {
         cerr << "Erro ao abrir arquivo de saída\n";
         return 1;
     }
@@ -285,11 +394,21 @@ int main(int argc, char **argv)
 
     string raw;
     int pc = 1;
+    int bipush_lines_idx = 0;
     while (getline(fin, raw))
     {
         rgsc.clear();
 
-        if (raw.size() < 21) {
+        if (bipush_lines_idx < bipush_lines.size() &&
+            bipush_lines_idx < bipush_values.size() &&
+            pc == bipush_lines[bipush_lines_idx])
+        {
+            H = bipush_values[bipush_lines_idx];
+            bipush_lines_idx++;
+        }
+
+        if (raw.size() < 21)
+        {
             cerr << "Linha muito curta: '" << raw << "'\n";
             continue;
         }
@@ -309,13 +428,14 @@ int main(int argc, char **argv)
             continue;
 
         int selB = decodificador_idx(b_bus);
-        if (selB < 0) {
+        if (selB < 0)
+        {
             fout << "Invalid B selector\n";
             ++pc;
             continue;
         }
 
-        i32 B = selB == 3 ? valor_reg_por_indice(selB-1) :  valor_reg_por_indice(selB);
+        i32 B = selB == 3 ? valor_reg_por_indice(selB - 1) : valor_reg_por_indice(selB);
 
         bool SLL8 = instr[0] == '1';
         bool SRA1 = instr[1] == '1';
@@ -330,36 +450,50 @@ int main(int argc, char **argv)
 
         bool considera_sinal = (selB != 3);
 
-        if (considera_sinal) selc_bus9bits(c_bus, r.sd);
-        else selc_bus9bits(c_bus, btod(toBin(r.sd).substr(24, 31)));
+        if (considera_sinal)
+            selc_bus9bits(c_bus, r.sd);
+        else
+            selc_bus9bits(c_bus, btod(toBin(r.sd).substr(24, 31)));
 
         bool WRITE = (wr.size() >= 1 && wr[0] == '1');
-        bool READ  = (wr.size() >= 2 && wr[1] == '1');
+        bool READ = (wr.size() >= 2 && wr[1] == '1');
         bool mem_conflict = WRITE && READ;
         string memLog;
 
         int mar_idx = static_cast<int>(MAR);
-        bool mar_ok = (mar_idx >= 0 && mar_idx < 8);
+        bool mar_ok = (mar_idx >= 0 && mar_idx < 16);
 
-
-        if (mem_conflict) {
+        if (mem_conflict)
+        {
             memLog = "Erro: WRITE e READ simultaneos.";
-        } else if (READ) {
-            if (mar_ok) {
+        }
+        else if (READ)
+        {
+            if (mar_ok)
+            {
                 MDR = static_cast<i32>(DATA_MEM[mar_idx]);
                 memLog = "READ: MDR <- M[" + to_string(MAR) + "]";
-            } else {
-                memLog = "READ ignorado: MAR fora de [0,7] (MAR=" + to_string(MAR) + ")";
             }
-        } else if (WRITE) {
-            if (mar_ok) {
+            else
+            {
+                memLog = "READ ignorado: MAR fora de [0,15] (MAR=" + to_string(MAR) + ")";
+            }
+        }
+        else if (WRITE)
+        {
+            if (mar_ok)
+            {
                 DATA_MEM[mar_idx] = static_cast<u32>(MDR);
                 save_data_mem();
                 memLog = "WRITE: M[" + to_string(MAR) + "] <- MDR";
-            } else {
-                memLog = "WRITE ignorado: MAR fora de [0,7] (MAR=" + to_string(MAR) + ")";
             }
-        } else {
+            else
+            {
+                memLog = "WRITE ignorado: MAR fora de [0,15] (MAR=" + to_string(MAR) + ")";
+            }
+        }
+        else
+        {
             memLog = "Sem operacao de memoria.";
         }
 
@@ -373,19 +507,20 @@ int main(int argc, char **argv)
             fout << "\nRegisters:\n";
             fout << "MAR = " << MAR << " (" << toBin(static_cast<u32>(MAR)) << ")\n";
             fout << "MDR = " << MDR << " (" << toBin(static_cast<u32>(MDR)) << ")\n";
-            fout << "PC  = " << PC  << " (" << toBin(static_cast<u32>(PC))  << ")\n";
-            fout << "MBR = " << MBR << " (" << toBin(static_cast<i8>(MBR)).substr(24, 31) << ")\n";  
-            fout << "SP  = " << SP  << " (" << toBin(static_cast<u32>(SP))  << ")\n";
-            fout << "LV  = " << LV  << " (" << toBin(static_cast<u32>(LV))  << ")\n";
+            fout << "PC  = " << PC << " (" << toBin(static_cast<u32>(PC)) << ")\n";
+            fout << "MBR = " << MBR << " (" << toBin(static_cast<i8>(MBR)).substr(24, 31) << ")\n";
+            fout << "SP  = " << SP << " (" << toBin(static_cast<u32>(SP)) << ")\n";
+            fout << "LV  = " << LV << " (" << toBin(static_cast<u32>(LV)) << ")\n";
             fout << "CPP = " << CPP << " (" << toBin(static_cast<u32>(CPP)) << ")\n";
             fout << "TOS = " << TOS << " (" << toBin(static_cast<u32>(TOS)) << ")\n";
-            fout << "OPC = " << OPC << " (" << toBin(static_cast<u32>(OPC)) << ")\n";  
-            fout << "H   = " << H   << " (" << toBin(static_cast<u32>(H))   << ")\n";
+            fout << "OPC = " << OPC << " (" << toBin(static_cast<u32>(OPC)) << ")\n";
+            fout << "H   = " << H << " (" << toBin(static_cast<u32>(H)) << ")\n";
         }
-        else {
-            if(r.shiftConflict)
+        else
+        {
+            if (r.shiftConflict)
                 fout << "> Error, invalid control signals.\n\n";
-            if(mem_conflict)
+            if (mem_conflict)
                 fout << "> Error, simultaneous memory READ and WRITE.\n";
         }
         ++pc;
